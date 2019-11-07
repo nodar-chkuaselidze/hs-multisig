@@ -5,195 +5,182 @@
 
 const assert = require('bsert');
 const MultisigMTX = require('../lib/primitives/mtx');
-const {KeyRing, Script, Coin} = require('bcoin');
+const {KeyRing, Script, Coin, consensus} = require('bcoin');
 
 const utils = require('./util/wallet');
 
 // 1 BTC
-const BTC = 100000000;
+const HNS = consensus.COIN;
 
 describe('MultisigMTX', function () {
-  for (const witness of [true, false]) {
-    it(`should get input signature (witness=${witness})`, async () => {
-      const ring = createRing(witness);
-      const ring2 = createRing(witness);
-      const {mtx, coins} = await createSpendingTX(ring, BTC);
-      const coin = coins[0];
+  it('should get input signature', async () => {
+    const ring = createRing();
+    const ring2 = createRing();
+    const {mtx, coins} = await createSpendingTX(ring, HNS);
+    const coin = coins[0];
 
-      // sign duplicate tx
-      const signedMTX = mtx.clone();
-      signedMTX.view = mtx.view;
+    // sign duplicate tx
+    const signedMTX = mtx.clone();
+    signedMTX.view = mtx.view;
 
-      const isWitness = mtx.isWitnessCoin(coin, ring);
-      assert.strictEqual(isWitness, witness);
+    const signed = signedMTX.sign(ring);
+    assert(signed, 'Could not sign transaction.');
 
-      const signed = signedMTX.sign(ring);
-      assert(signed, 'Could not sign transaction.');
+    let sig;
+    {
+      // get signature from input
+      const input = signedMTX.inputs[0];
+      const signScript = input.witness;
+      const vector = signScript.toStack();
 
-      let sig;
-      {
-        // get signature from input
-        const input = signedMTX.inputs[0];
-        const signScript = isWitness ? input.witness : input.script;
-        const vector = signScript.toStack();
+      sig = vector.get(0);
+    }
 
-        sig = vector.get(0);
-      }
+    const sig2 = mtx.getInputSignature(0, coin, ring);
+    const check1 = mtx.checkSignature(0, coin, ring, sig);
 
-      const sig2 = mtx.getInputSignature(0, coin, ring);
-      const check1 = mtx.checkSignature(0, coin, ring, sig);
+    assert.bufferEqual(sig2, sig);
+    assert.strictEqual(check1, true);
 
-      assert.bufferEqual(sig2, sig);
-      assert.strictEqual(check1, true);
+    let err;
+    try {
+      mtx.checkSignature(0, coin, ring2, sig);
+    } catch (e) {
+      err = e;
+    }
 
-      let err;
-      try {
-        mtx.checkSignature(0, coin, ring2, sig);
-      } catch (e) {
-        err = e;
-      }
+    assert(err);
+    assert.strictEqual(err.message, 'Coin does not belong to the ring.');
 
-      assert(err);
-      assert.strictEqual(err.message, 'Coin does not belong to the ring.');
+    // apply signature
+    sig = null;
+    err = null;
 
-      // apply signature
-      sig = null;
-      err = null;
+    mtx.scriptInput(0, coin, ring);
+    let applied = mtx.applySignature(0, coin, ring, sig2);
 
-      mtx.scriptInput(0, coin, ring);
-      let applied = mtx.applySignature(0, coin, ring, sig2);
+    assert.strictEqual(applied, true);
 
-      assert.strictEqual(applied, true);
+    {
+      const input = mtx.inputs[0];
+      const signScript = input.witness;
+      const vector = signScript.toStack();
 
-      {
-        const input = mtx.inputs[0];
-        const signScript = isWitness ? input.witness : input.script;
-        const vector = signScript.toStack();
+      sig = vector.get(0);
+    }
 
-        sig = vector.get(0);
-      }
+    assert.bufferEqual(sig, sig2);
 
-      assert.bufferEqual(sig, sig2);
+    // reset mtx input
+    applied = mtx.applySignature(0, coin, ring2, sig2);
+    assert.strictEqual(applied, false);
+  });
 
-      // reset mtx input
-      applied = mtx.applySignature(0, coin, ring2, sig2);
-      assert.strictEqual(applied, false);
-    });
+  it('should get input signature multisig', async () => {
+    // generate keys
+    const [ring1, ring2] = createMultisigRings();
+    const {mtx, coins} = await createSpendingTX(ring1, HNS);
+    const coin = coins[0];
 
-    it(`should get input signature multisig (witness=${witness})`, async () => {
-      // generate keys
-      const [ring1, ring2] = createMultisigRings(witness);
-      const {mtx, coins} = await createSpendingTX(ring1, BTC);
-      const coin = coins[0];
+    const signedMTX = mtx.clone();
+    signedMTX.view = mtx.view;
 
-      const signedMTX = mtx.clone();
-      signedMTX.view = mtx.view;
+    // sign with first key.
+    const signed = signedMTX.sign(ring1);
+    assert(signed, 'Could not sign transaction.');
 
-      const isWitness = mtx.isWitnessCoin(coin, ring1);
-      assert.strictEqual(isWitness, witness);
+    let sig;
 
-      // sign with first key.
-      const signed = signedMTX.sign(ring1);
-      assert(signed, 'Could not sign transaction.');
+    {
+      const input = signedMTX.inputs[0];
+      const signScript = input.witness;
+      const vector = signScript.toStack();
 
-      let sig;
+      // get signatures from stack
+      const [sig1, sig2] = [vector.get(1), vector.get(2)];
+      sig = sig1.length > 0 ? sig1 : sig2;
+    }
 
-      {
-        const input = signedMTX.inputs[0];
-        const signScript = isWitness ? input.witness : input.script;
-        const vector = signScript.toStack();
+    // choose correct signature
+    const sig2 = mtx.getInputSignature(0, coin, ring1);
 
-        // get signatures from stack
-        const [sig1, sig2] = [vector.get(1), vector.get(2)];
-        sig = sig1.length > 0 ? sig1 : sig2;
-      }
+    assert.bufferEqual(sig2, sig, 'Signature is not correct.');
+    assert.strictEqual(mtx.checkSignature(0, coin, ring1, sig), true);
+    assert.strictEqual(mtx.checkSignature(0, coin, ring2, sig), false);
 
-      // choose correct signature
-      const sig2 = mtx.getInputSignature(0, coin, ring1);
+    mtx.scriptInput(0, coin, ring1);
 
-      assert.bufferEqual(sig2, sig, 'Signature is not correct.');
-      assert.strictEqual(mtx.checkSignature(0, coin, ring1, sig), true);
-      assert.strictEqual(mtx.checkSignature(0, coin, ring2, sig), false);
+    const applied = mtx.applySignature(0, coin, ring1, sig);
+    assert.strictEqual(applied, true);
 
-      mtx.scriptInput(0, coin, ring1);
+    sig = null;
 
-      const applied = mtx.applySignature(0, coin, ring1, sig);
-      assert.strictEqual(applied, true);
+    {
+      const input = mtx.inputs[0];
+      const signScript = input.witness;
+      const vector = signScript.toStack();
 
-      sig = null;
+      // get signatures from stack
+      const [sig1, sig2] = [vector.get(1), vector.get(2)];
+      sig = sig1.length > 0 ? sig1 : sig2;
+    }
 
-      {
-        const input = mtx.inputs[0];
-        const signScript = isWitness ? input.witness : input.script;
-        const vector = signScript.toStack();
+    assert.bufferEqual(sig, sig2);
+  });
 
-        // get signatures from stack
-        const [sig1, sig2] = [vector.get(1), vector.get(2)];
-        sig = sig1.length > 0 ? sig1 : sig2;
-      }
+  it('should get signatures for rings', async () => {
+    // NOTE: should we accept multiple rings
+    // and arrays of signatures ?
+    // It will results signatures to be inside array
+    const [ring1, ring2] = createMultisigRings();
+    const {mtx} = await createSpendingTX(ring1, HNS, 2);
 
-      assert.bufferEqual(sig, sig2);
-    });
+    const sigs1 = mtx.getSignatures([ring1, ring1]);
+    const sigs2 = mtx.getSignatures([ring2, ring2]);
+    const rings1 = [ring1, ring1];
+    const rings2 = [ring2, ring2];
 
-    it(`should get signatures for rings (witness=${witness})`, async () => {
-      // NOTE: should we accept multiple rings
-      // and arrays of signatures ?
-      // It will results signatures to be inside array
-      const [ring1, ring2] = createMultisigRings(witness);
-      const {mtx} = await createSpendingTX(ring1, BTC, 2);
+    mtx.applySignatures(rings1, sigs1, true);
+    mtx.applySignatures(rings2, sigs2, true);
 
-      const sigs1 = mtx.getSignatures([ring1, ring1]);
-      const sigs2 = mtx.getSignatures([ring2, ring2]);
-      const rings1 = [ring1, ring1];
-      const rings2 = [ring2, ring2];
+    assert.strictEqual(mtx.checkSignatures(rings1, sigs1), 2);
+    assert.strictEqual(mtx.checkSignatures(rings2, sigs2), 2);
 
-      mtx.applySignatures(rings1, sigs1, true);
-      mtx.applySignatures(rings2, sigs2, true);
+    assert.strictEqual(mtx.checkSignatures([ring1, ring2], sigs1), 1);
+    assert.strictEqual(mtx.checkSignatures([ring1, ring2], sigs2), 1);
 
-      assert.strictEqual(mtx.checkSignatures(rings1, sigs1), 2);
-      assert.strictEqual(mtx.checkSignatures(rings2, sigs2), 2);
+    assert.strictEqual(mtx.checkSignatures(rings2, sigs1), 0);
+    assert.strictEqual(mtx.checkSignatures(rings1, sigs2), 0);
 
-      assert.strictEqual(mtx.checkSignatures([ring1, ring2], sigs1), 1);
-      assert.strictEqual(mtx.checkSignatures([ring1, ring2], sigs2), 1);
+    assert.strictEqual(mtx.isSigned(), true, 'MTX is not signed.');
+    assert.strictEqual(mtx.verify(), true, 'MTX verification failed.');
+  });
 
-      assert.strictEqual(mtx.checkSignatures(rings2, sigs1), 0);
-      assert.strictEqual(mtx.checkSignatures(rings1, sigs2), 0);
+  it('should empty inputs for transaction', async () => {
+    const [ring1, ring2] = createMultisigRings();
+    const {mtx} = await createSpendingTX(ring1, HNS, 2);
 
-      assert.strictEqual(mtx.isSigned(), true, 'MTX is not signed.');
-      assert.strictEqual(mtx.verify(), true, 'MTX verification failed.');
-    });
+    mtx.sign([ring1, ring2]);
 
-    it(`should empty inputs for transaction (witness=${witness})`, async () => {
-      const [ring1, ring2] = createMultisigRings(witness);
-      const {mtx} = await createSpendingTX(ring1, BTC, 2);
+    mtx.emptyInputs();
 
-      mtx.sign([ring1, ring2]);
+    for (const input of mtx.inputs) {
+      const {witness} = input;
 
-      mtx.emptyInputs();
-
-      for (const input of mtx.inputs) {
-        const {script, witness} = input;
-
-        assert.strictEqual(script.length, 0, 'Script is not empty.');
-        assert.strictEqual(witness.length, 0, 'Witness is not empty.');
-      }
-    });
-  }
+      assert.strictEqual(witness.length, 0, 'Witness is not empty.');
+    }
+  });
 });
 
 /**
  * Create multisig 2-of-2 keyrings
  * @ignore
- * @param {Boolean} witness
  * @returns {[KeyRing, KeyRing]}
  */
 
-function createMultisigRings(witness) {
-  const key1 = KeyRing.generate(true);
-  const key2 = KeyRing.generate(true);
-
-  key1.witness = witness;
-  key2.witness = witness;
+function createMultisigRings() {
+  const key1 = KeyRing.generate();
+  const key2 = KeyRing.generate();
 
   const [pub1, pub2] = [key1.publicKey, key2.publicKey];
 
@@ -207,15 +194,11 @@ function createMultisigRings(witness) {
 /**
  * Create p2pkh keyring
  * @ignore
- * @param {Boolean} witness
  * @returns {KeyRing}
  */
 
-function createRing(witness) {
-  const key = KeyRing.generate(true);
-
-  key.witness = witness;
-
+function createRing() {
+  const key = KeyRing.generate();
   return key;
 }
 

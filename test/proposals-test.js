@@ -9,7 +9,8 @@ const testUtils = require('./util/utils');
 const {forEvent} = testUtils;
 const CosignerCtx = require('./util/cosigner-context');
 const bcoin = require('bcoin');
-const {Script, KeyRing, MTX, Amount} = bcoin;
+const {Script, KeyRing, MTX, Amount, pkg} = bcoin;
+const {consensus} = bcoin;
 const WalletDB = bcoin.wallet.WalletDB;
 const WalletNodeClient = require('../lib/walletclient');
 const MultisigDB = require('../lib/multisigdb');
@@ -20,8 +21,7 @@ const {CREATE, REJECT} = Proposal.payloadType;
 const TEST_WALLET_ID = 'test1';
 const TEST_WALLET_ID2 = 'test2';
 
-for (const WITNESS of [true, false])
-describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
+describe('MultisigProposals', function () {
   // 2-of-2 will be used for tests
   let wdb, msdb;
 
@@ -81,7 +81,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
     cosigner1 = cosignerCtx1.toCosigner();
     cosigner2 = cosignerCtx2.toCosigner();
 
-    mswallet = await mkWallet(msdb, TEST_WALLET_ID, 2, 2, WITNESS, [
+    mswallet = await mkWallet(msdb, TEST_WALLET_ID, 2, 2, [
       cosignerCtx1,
       cosignerCtx2
     ]);
@@ -113,7 +113,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
       subtractFee: true,
       outputs: [{
         address: address,
-        value: Amount.fromBTC(2).toValue()
+        value: Amount.from(pkg.unit, 2).toValue()
       }]
     };
 
@@ -136,8 +136,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
         mswallet,
         proposal,
         cosignerCtxs,
-        cosignerCtx1,
-        WITNESS
+        cosignerCtx1
       );
 
       assert.strictEqual(sigs.length, 2, 'Wrong number of signatures.');
@@ -192,8 +191,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
         mswallet,
         proposal,
         cosignerCtxs,
-        cosignerCtx2,
-        WITNESS
+        cosignerCtx2
       );
 
       const approved2 = await mswallet.approveProposal(
@@ -211,7 +209,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
     });
 
     it('should approve proposal (2-of-3)', async () => {
-      const mswallet2 = await mkWallet(msdb, TEST_WALLET_ID2, 2, 3, WITNESS, [
+      const mswallet2 = await mkWallet(msdb, TEST_WALLET_ID2, 2, 3, [
         cosignerCtx1,
         cosignerCtx2,
         cosignerCtx3
@@ -240,7 +238,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
       { // cosigner2
         const rings = testUtils.getMTXRings(
-          mtx, paths, priv2, xpubs, 2, WITNESS
+          mtx, paths, priv2, xpubs, 2
         );
 
         const sigs = testUtils.getMTXSignatures(mtx, rings);
@@ -259,7 +257,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
       { // cosigner3
         const rings = testUtils.getMTXRings(
-          mtx, paths, priv3, xpubs, 2, WITNESS
+          mtx, paths, priv3, xpubs, 2
         );
         const sigs = testUtils.getMTXSignatures(mtx, rings);
         assert.strictEqual(sigs.length, 2);
@@ -291,7 +289,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
         const paths = await mswallet.getInputPaths(mtx);
 
         const rings = testUtils.getMTXRings(
-          mtx, paths, priv, [xpub1, xpub2], 2, WITNESS
+          mtx, paths, priv, [xpub1, xpub2], 2
         );
         const signatures = testUtils.getMTXSignatures(mtx, rings);
 
@@ -320,7 +318,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
       const paths = await mswallet.getInputPaths(mtx);
 
       const rings = testUtils.getMTXRings(
-        mtx, paths, priv1, [xpub1, xpub2], 2, WITNESS
+        mtx, paths, priv1, [xpub1, xpub2], 2
       );
       const signatures = testUtils.getMTXSignatures(mtx, rings);
 
@@ -447,7 +445,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
   describe('Coin spends', function() {
     it('should reject proposal on mempool double spend', async () => {
-      const amount = Amount.fromBTC(1).toValue();
+      const amount = Amount.from(pkg.unit, 1).toValue();
       const account = await mswallet.getAccount();
       const mtx = walletUtils.createFundTX(account.receiveAddress(), amount);
 
@@ -491,8 +489,6 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
             proposal.n,
             [p1.publicKey, p2.publicKey]
           );
-
-          ring.witness = WITNESS;
 
           const signed = mtx.sign(ring);
 
@@ -644,8 +640,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
           mswallet,
           proposal,
           cosignerCtxs,
-          ctx,
-          WITNESS
+          ctx
         );
       }));
 
@@ -879,7 +874,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
       assert.deepStrictEqual(stats.toJSON(), {
         lockedOwnCoins: 2,
-        lockedOwnBalance: 200000000,
+        lockedOwnBalance: 2 * consensus.COIN,
         proposals: 1,
         pending: 1,
         rejected: 0,
@@ -898,7 +893,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
         assert.deepStrictEqual(stats.toJSON(), {
           lockedOwnCoins: 2,
-          lockedOwnBalance: 200000000,
+          lockedOwnBalance: 2 * consensus.COIN,
           proposals: 1,
           pending: 1,
           rejected: 0,
@@ -911,8 +906,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
           mswallet,
           proposal,
           cosignerCtxs,
-          ctx,
-          WITNESS
+          ctx
         );
       }));
 
@@ -933,7 +927,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
         assert.deepStrictEqual(stats.toJSON(), {
           lockedOwnCoins: 2,
-          lockedOwnBalance: 200000000,
+          lockedOwnBalance: 2 * consensus.COIN,
           proposals: 1,
           pending: 0,
           rejected: 0,
@@ -971,7 +965,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
         assert.deepStrictEqual(stats.toJSON(), {
           lockedOwnCoins: 2,
-          lockedOwnBalance: 300000000,
+          lockedOwnBalance: 3 * consensus.COIN,
           proposals: 1,
           pending: 1,
           approved: 0,
@@ -1012,7 +1006,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
         assert.deepStrictEqual(stats.toJSON(), {
           lockedOwnCoins: 1,
-          lockedOwnBalance: 100000000,
+          lockedOwnBalance: consensus.COIN,
           proposals: 1,
           pending: 1,
           approved: 0,
@@ -1047,7 +1041,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
         assert.deepStrictEqual(stats.toJSON(), {
           lockedOwnCoins: 2,
-          lockedOwnBalance: 300000000,
+          lockedOwnBalance: 3 * consensus.COIN,
           proposals: 1,
           pending: 1,
           approved: 0,
@@ -1089,7 +1083,7 @@ describe(`MultisigProposals ${WITNESS ? 'witness' : 'legacy'}`, function () {
  * @returns {MultisigWallet}
  */
 
-async function mkWallet(msdb, walletName, m, n, witness = true, cosignerCtxs = []) {
+async function mkWallet(msdb, walletName, m, n, cosignerCtxs = []) {
   const cosigners = cosignerCtxs.map((c) => {
     c.walletName = walletName;
     c.refresh();
@@ -1101,7 +1095,6 @@ async function mkWallet(msdb, walletName, m, n, witness = true, cosignerCtxs = [
     id: walletName,
     m: m,
     n: n,
-    witness: witness,
     joinPubKey: cosignerCtxs[0].joinPubKey
   }, author);
 
@@ -1160,11 +1153,10 @@ async function mkProposal(wallet, cosignerCtx, btc, memo = 'proposal') {
  * @param {Number} options.m
  * @param {Number} options.pid - proposal id
  * @param {CosignerCtx} options.cosignerCtx - signer
- * @param {Boolean} options.witness
  * @returns {Buffer[]} signatures
  */
 
-async function signProposal(mswallet, proposal, cosignerCtxs, cosignerCtx, witness = true) {
+async function signProposal(mswallet, proposal, cosignerCtxs, cosignerCtx) {
   const mtx = await mswallet.getProposalMTX(proposal.id);
   const paths = await mswallet.getInputPaths(mtx);
 
@@ -1182,8 +1174,7 @@ async function signProposal(mswallet, proposal, cosignerCtxs, cosignerCtx, witne
     paths,
     privKey,
     xpubs,
-    m,
-    witness
+    m
   );
 
   const signatures = testUtils.getMTXSignatures(mtx, rings);
@@ -1191,14 +1182,14 @@ async function signProposal(mswallet, proposal, cosignerCtxs, cosignerCtx, witne
   return signatures;
 };
 
-function getTXOptions(btc) {
+function getTXOptions(hns) {
   const address = generateAddress();
 
   const txoptions = {
     subtractFee: true,
     outputs: [{
       address: address,
-      value: Amount.fromBTC(btc).toValue()
+      value: Amount.from(pkg.unit, hns).toValue()
     }]
   };
 
@@ -1206,7 +1197,7 @@ function getTXOptions(btc) {
     subtractFee: true,
     outputs: [{
       address: address.toString(),
-      value: Amount.fromBTC(btc).toValue()
+      value: Amount.from(pkg.unit, hns).toValue()
     }]
   };
 

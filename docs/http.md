@@ -670,8 +670,7 @@ HTTP Response:
       "branch": 0,
       "index": 2,
       "receive": true,
-      "change": false,
-      "nested": false
+      "change": false
     }
   ],
   "scripts": null
@@ -914,7 +913,6 @@ HTTP Response:
       "accountIndex": 0,
       "receiveDepth": 1,
       "changeDepth": 1,
-      "nestedDepth": 1,
       "lookahead": 11,
       "accountKey": "rpubKBBV6Y2asgWUBVPmPfaBdufC4RxMoB2HYBxi1bN9bW9Pyodf5TWAJeog7NBsradD5MHe9M7RWkK6p5ZGir6iVHUiQdVSVrKVSU19xYmVQMLV",
       "keys": [

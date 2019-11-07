@@ -3,7 +3,7 @@
 const bcoin = require('bcoin');
 const hash256 = require('bcrypto/lib/hash256');
 const random = require('bcrypto/lib/random');
-const {Script, Amount, MTX, Input, Outpoint} = bcoin;
+const {Script, Amount, MTX, Input, Outpoint, pkg} = bcoin;
 
 exports.curBlock = (wdb) => {
   return exports.fakeBlock(wdb.state.height);
@@ -75,7 +75,7 @@ exports.fundWalletBlock = async (wdb, mswallet, amount) => {
 };
 
 exports.fundAddressBlock = async (wdb, address, amount) => {
-  amount = Amount.fromBTC(amount).toValue();
+  amount = Amount.from(pkg.unit, amount).toValue();
 
   const mtx = exports.createFundTX(address, amount);
 
@@ -117,7 +117,7 @@ exports.fundWalletBlockCB = async (wdb, mswallet, amount) => {
 };
 
 exports.fundAddressBlockCB = async (wdb, address, amount) => {
-  amount = Amount.fromBTC(amount).toValue();
+  amount = Amount.from(pkg.unit, amount).toValue();
 
   const mtx = exports.createCoinbaseFundTX(address, amount);
 

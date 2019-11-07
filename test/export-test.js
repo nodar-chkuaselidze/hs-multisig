@@ -12,7 +12,7 @@ const {
   CosignerDetails
 } = require('../lib/export');
 
-const NETWORK_NAME = 'regtest';
+const NETWORK_NAME = 'testnet';
 const network = Network.get(NETWORK_NAME);
 const data = require('./data/export.json');
 

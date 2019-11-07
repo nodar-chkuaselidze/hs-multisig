@@ -10,14 +10,14 @@ const {forEvent} = testUtils;
 
 const bcoin = require('bcoin');
 const {Network, FullNode} = bcoin;
-const {MTX, TX, Amount, KeyRing} = bcoin;
+const {MTX, TX, Amount, KeyRing, pkg} = bcoin;
 const {wallet} = bcoin;
 const Proposal = require('../lib/primitives/proposal');
 const CosignerCtx = require('./util/cosigner-context');
 const {CREATE, REJECT} = Proposal.payloadType;
 
 const MultisigClient = require('../lib/client');
-const {WalletClient} = require('bclient');
+const {WalletClient} = require('hs-client');
 const {WalletDetails} = require('../lib/export');
 
 const NETWORK_NAME = 'regtest';
@@ -26,8 +26,7 @@ const ADMIN_TOKEN = Buffer.alloc(32, 250).toString('hex');
 
 const network = Network.get(NETWORK_NAME);
 
-for (const WITNESS of [true, false])
-describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
+describe('HTTP', function () {
   const options = {
     network: NETWORK_NAME,
     apiKey: API_KEY,
@@ -38,8 +37,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
   const WALLET_OPTIONS = {
     m: 2,
     n: 2,
-    id: 'test',
-    witness: WITNESS
+    id: 'test'
   };
 
   const fullNode = new FullNode({
@@ -381,8 +379,6 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
     assert.strictEqual(account.initialized, msWalletDetails.initialized);
     assert(account.receiveAddress);
     assert(account.changeAddress);
-    if (WALLET_OPTIONS.witness)
-      assert(account.nestedAddress);
     assert.strictEqual(account.m, 2);
     assert.strictEqual(account.n, 2);
     assert.strictEqual(account.keys.length, 1);
@@ -689,7 +685,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
     assert.deepStrictEqual(proposal.options, proposalOptions);
 
-    const tx = TX.fromRaw(proposal.tx, 'hex');
+    const tx = TX.fromHex(proposal.tx);
 
     pid1 = proposal.id;
     poptions1 = proposal.options;
@@ -831,7 +827,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
     for (const [i, input] of Object.entries(tx.inputs)) {
       // convert the transaction the prevout
       // comes from into a mtx
-      const mtx = MTX.fromRaw(txs[i], 'hex');
+      const mtx = MTX.fromHex(txs[i]);
       // the hashes should match
       assert.equal(input.prevout.hash, mtx.txid().toString('hex'));
 
@@ -844,8 +840,8 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
       // assert that the scripts are equal
       assert.equal(
-        output.script.toRaw('hex').toString('hex'),
-        input.coin.script
+        output.address.toString(NETWORK_NAME),
+        input.coin.address
       );
     }
   });
@@ -1028,7 +1024,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
     const xpub2 = cosignerCtx2.accountKey;
 
     const rings = testUtils.getMTXRings(
-      mtx, paths, priv1, [xpub1, xpub2], 2, WITNESS
+      mtx, paths, priv1, [xpub1, xpub2], 2
     );
 
     const signatures = testUtils.getMTXSignatures(mtx, rings);
@@ -1095,8 +1091,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
       paths,
       priv2,
       [xpub1, xpub2],
-      2,
-      WALLET_OPTIONS.witness
+      2
     );
 
     const signatures = testUtils.getMTXSignatures(mtx, rings);
@@ -1150,7 +1145,7 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
 
     // we are not spending it yet.
     await wdb.addBlock(walletUtils.nextBlock(wdb), []);
-    assert.strictEqual(Amount.fromBTC(5).toValue(), balance1.confirmed);
+    assert.strictEqual(Amount.from(pkg.unit, 5).toValue(), balance1.confirmed);
 
     assert.strictEqual(proposal.statusCode, Proposal.status.APPROVED);
     assert.strictEqual(Object.keys(proposal.approvals).length, 2);
@@ -1212,12 +1207,12 @@ describe(`HTTP ${WITNESS ? 'witness' : 'legacy'}`, function () {
  * Helpers
  */
 
-function getTXOptions(btc) {
+function getTXOptions(hns) {
   return {
     subtractFee: true,
     outputs: [{
       address: generateAddress().toString(network),
-      value: Amount.fromBTC(btc).toValue()
+      value: Amount.from(pkg.unit, hns).toValue()
     }]
   };
 }
