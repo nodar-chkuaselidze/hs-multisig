@@ -30,7 +30,7 @@
   "license": "MIT",
   "dependencies": {
     "hs-client": "~0.0.6",
-    "bcoin": "github:handshake-org/hsd#dbcdc853",
+    "bcoin": "github:nodar-chkuaselidze/hsd#fix-mtx",
     "bcrypto": "~4.2.3",
     "bdb": "~1.1.7",
     "bevent": "~0.1.5",
