@@ -5,7 +5,7 @@
 
 const assert = require('bsert');
 const Logger = require('blgr');
-const {wallet, hd, Network} = require('bcoin');
+const {wallet, hd, Network} = require('hsd');
 const {WalletDB, MasterKey} = wallet;
 const {Mnemonic} = hd;
 

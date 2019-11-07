@@ -1,7 +1,7 @@
 'use strict';
 
-const bcoin = require('bcoin');
-const {MTX, KeyRing, Script} = bcoin;
+const hsd = require('hsd');
+const {MTX, KeyRing, Script} = hsd;
 const MultisigMTX = require('../../lib/primitives/mtx');
 
 /**

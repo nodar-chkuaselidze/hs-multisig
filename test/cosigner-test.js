@@ -6,7 +6,7 @@
 const assert = require('bsert');
 const Cosigner = require('../lib/primitives/cosigner');
 const bufio = require('bufio');
-const {hd} = require('bcoin');
+const {hd} = require('hsd');
 const secp256k1 = require('bcrypto/lib/secp256k1');
 const sigUtils = require('../lib/utils/sig');
 

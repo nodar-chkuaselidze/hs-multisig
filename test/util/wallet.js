@@ -1,9 +1,9 @@
 'use strict';
 
-const bcoin = require('bcoin');
+const hsd = require('hsd');
 const hash256 = require('bcrypto/lib/hash256');
 const random = require('bcrypto/lib/random');
-const {Script, Amount, MTX, Input, Outpoint, pkg} = bcoin;
+const {Script, Amount, MTX, Input, Outpoint, pkg} = hsd;
 
 exports.curBlock = (wdb) => {
   return exports.fakeBlock(wdb.state.height);

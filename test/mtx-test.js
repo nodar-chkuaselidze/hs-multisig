@@ -5,7 +5,7 @@
 
 const assert = require('bsert');
 const MultisigMTX = require('../lib/primitives/mtx');
-const {KeyRing, Script, Coin, consensus} = require('bcoin');
+const {KeyRing, Script, Coin, consensus} = require('hsd');
 
 const utils = require('./util/wallet');
 

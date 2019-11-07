@@ -4,7 +4,7 @@
 'use strict';
 
 const assert = require('bsert');
-const Network = require('bcoin/lib/protocol/network');
+const Network = require('hsd/lib/protocol/network');
 
 const {
   WalletDetails,

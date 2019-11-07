@@ -8,10 +8,10 @@ const walletUtils = require('./util/wallet');
 const testUtils = require('./util/utils');
 const {forEvent} = testUtils;
 
-const bcoin = require('bcoin');
-const {Network, FullNode} = bcoin;
-const {MTX, TX, Amount, KeyRing, pkg} = bcoin;
-const {wallet} = bcoin;
+const hsd = require('hsd');
+const {Network, FullNode} = hsd;
+const {MTX, TX, Amount, KeyRing, pkg} = hsd;
+const {wallet} = hsd;
 const Proposal = require('../lib/primitives/proposal');
 const CosignerCtx = require('./util/cosigner-context');
 const {CREATE, REJECT} = Proposal.payloadType;
